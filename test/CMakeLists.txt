@@ -1,5 +1,3 @@
-project(kdtree_tests)
-
 add_executable(kdtree_tests
     tests.cpp
 )

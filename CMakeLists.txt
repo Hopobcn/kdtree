@@ -1,7 +1,7 @@
-project(kdtree)
+project(kdtree CXX)
 cmake_minimum_required(VERSION 2.6)
 
-list(APPEND CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS}")
+list(APPEND CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
 
 find_package(Boost 1.50.0 REQUIRED COMPONENTS)
 mark_as_advanced(Boost_DIR)
@@ -13,6 +13,7 @@ find_package(GTest)
 if(GTEST_FOUND)
     include(FindThreads)
     if(Threads_FOUND)
+        include_directories(${GTEST_INCLUDE_DIRS})
         set(GTEST_LIBRARIES ${GTEST_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
         enable_testing()
         add_subdirectory(test)

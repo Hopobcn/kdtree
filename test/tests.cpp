@@ -93,8 +93,9 @@ public:
 protected:
     virtual void SetUp() {
         randomPoints(m_point_count, m_points);
-        for (std::size_t i = 0; i < m_points.size(); i++) {
-            m_tree.add(&m_points[i], &m_points[i]); // No insert, just adding
+        //for (std::size_t i = 0; i < m_points.size(); i++) {
+        for (auto&& point : m_points) {
+            m_tree.add(&point, &point); // No insert, just adding
         }
         m_tree.build(); // Bulk build
     }

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <vector>
+#include <random>
 #include <iostream>
 #include <chrono>
 #include <ctime>
@@ -83,7 +84,7 @@ void LinearSearch(const Point& query, const std::vector<Point>& locations, std::
 class KdTreeTest : public ::testing::Test {
 public:
     KdTreeTest()
-        : m_gen(std::time(0)),
+        : m_gen(m_rd()),
           m_dis_x(-10, 10),
           m_dis_y(-10, 10),
           m_query_count(1000),
@@ -109,11 +110,12 @@ protected:
     }
     std::vector<Point> m_points;
     kdtree<Point> m_tree;
-    boost::mt19937 m_gen;
-    boost::random::uniform_real_distribution<> m_dis_x;
-    boost::random::uniform_real_distribution<> m_dis_y;
-    size_t m_query_count;
-    size_t m_point_count;
+    std::random_device m_rd;
+    std::mt19937 m_gen;
+    std::uniform_real_distribution<> m_dis_x;
+    std::uniform_real_distribution<> m_dis_y;
+    std::size_t m_query_count;
+    std::size_t m_point_count;
 };
 
 TEST_F(KdTreeTest, build_tree_performance) {

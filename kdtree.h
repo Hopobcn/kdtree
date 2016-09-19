@@ -132,7 +132,8 @@ public:
 
 private:
     struct kdnode {
-        typedef std::shared_ptr<kdnode> ptr;
+        using ptr = std::shared_ptr<kdnode>;
+
         ptr left;
         ptr right;
         int axis;
@@ -145,9 +146,9 @@ private:
               data(d) {}
     };
 
-    typedef typename kdnode::ptr node_ptr; // get rid of annoying typename
-    typedef std::vector<node_ptr> Nodes;
-    typedef std::pair<double, node_ptr> DistanceTuple;
+    using node_ptr      = typename kdnode::ptr; // get rid of annoying typename
+    using Nodes         = std::vector<node_ptr>;
+    using DistanceTuple = std::pair<double, node_ptr>;
 
     struct SmallestOnTop {
         bool operator()(const DistanceTuple& a, const DistanceTuple& b) const
@@ -163,8 +164,8 @@ private:
         }
     };
 
-    typedef std::priority_queue<DistanceTuple, std::vector<DistanceTuple>, SmallestOnTop> MinPriorityQueue;
-    typedef std::priority_queue<DistanceTuple, std::vector<DistanceTuple>, LargestOnTop> MaxPriorityQueue;
+    using MinPriorityQueue = std::priority_queue<DistanceTuple, std::vector<DistanceTuple>, SmallestOnTop>;
+    using MaxPriorityQueue = std::priority_queue<DistanceTuple, std::vector<DistanceTuple>, LargestOnTop>;
     Nodes m_nodes;
     node_ptr m_root;
 

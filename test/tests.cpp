@@ -27,8 +27,6 @@ namespace bg = boost::geometry;
 namespace bgm = bg::model;
 namespace bacc = boost::accumulators;
 
-using Point = bgm::d2::point_xy<double>;
-
 using TimeAccumulator = bacc::accumulator_set< std::size_t,
                                                bacc::stats< bacc::tag::mean,
                                                             bacc::tag::min,
@@ -52,9 +50,10 @@ std::ostream& operator<<(std::ostream &out, const TimeAccumulator &acc) {
 template <typename Point>
 void randomPoints(std::size_t nr, std::vector<Point>& points) {
     points.resize(nr);
-    boost::mt19937 gen(time(0));
-    boost::random::uniform_real_distribution<> dis_x(-10 , 10);
-    boost::random::uniform_real_distribution<> dis_y(-10 , 10);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis_x(-10, 10);
+    std::uniform_real_distribution<> dis_y(-10, 10);
     for (size_t i = 0; i < nr; i++) {
         Point p = {dis_x(gen), dis_y(gen)};
         points.push_back(p);
@@ -68,6 +67,7 @@ struct ComparePairFirst {
     }
 };
 
+template <typename Point>
 void LinearSearch(const Point& query, const std::vector<Point>& locations, std::size_t k, std::vector<const Point*>& result) {
     std::vector<std::pair<double, std::size_t>> tmp;
     for (std::size_t i = 0; i < locations.size(); i++) {
@@ -81,7 +81,47 @@ void LinearSearch(const Point& query, const std::vector<Point>& locations, std::
     }
 }
 
+template <typename Point>
 class KdTreeTest : public ::testing::Test {
+public:
+    KdTreeTest()
+        : m_gen(m_rd()),
+          m_query_count(1000),
+          m_point_count(100000) {}
+
+protected:
+    virtual void SetUp()
+    {
+        randomPoints(m_point_count, m_points);
+        for (auto&& point : m_points) {
+            m_tree.add(&point, &point); // No insert, just adding
+        }
+        m_tree.build(); // Bulk build
+    }
+
+    virtual void TearDown()
+    {
+        m_tree.clear();
+        m_points.clear();
+    }
+
+    Point RandomPoint();
+
+    using Data = Point;
+
+    std::vector<Point> m_points;
+    kdtree<Data, Point> m_tree;
+    std::random_device m_rd;
+    std::mt19937 m_gen;
+    //std::uniform_real_distribution<> m_dis[Dimensions];
+    std::size_t m_query_count;
+    std::size_t m_point_count;
+};
+
+
+template <>
+class KdTreeTest<bgm::point<double, 2, boost::geometry::cs::cartesian>> : public ::testing::Test {
+    using Point = bgm::point<double, 2, boost::geometry::cs::cartesian>;
 public:
     KdTreeTest()
         : m_gen(m_rd()),
@@ -94,7 +134,6 @@ public:
 protected:
     virtual void SetUp() {
         randomPoints(m_point_count, m_points);
-        //for (std::size_t i = 0; i < m_points.size(); i++) {
         for (auto&& point : m_points) {
             m_tree.add(&point, &point); // No insert, just adding
         }
@@ -108,8 +147,11 @@ protected:
     Point RandomPoint() {
         return {m_dis_x(m_gen), m_dis_y(m_gen)};
     }
+
+    using Data = Point;
+
     std::vector<Point> m_points;
-    kdtree<Point> m_tree;
+    kdtree<Data, Point> m_tree;
     std::random_device m_rd;
     std::mt19937 m_gen;
     std::uniform_real_distribution<> m_dis_x;
@@ -118,26 +160,80 @@ protected:
     std::size_t m_point_count;
 };
 
-TEST_F(KdTreeTest, build_tree_performance) {
+template <>
+class KdTreeTest<bgm::point<double, 3, boost::geometry::cs::cartesian>> : public ::testing::Test {
+    using Point = bgm::point<double, 3, boost::geometry::cs::cartesian>;
+public:
+    KdTreeTest()
+        : m_gen(m_rd()),
+          m_dis_x(-10, 10),
+          m_dis_y(-10, 10),
+          m_dis_z(-10, 10),
+          m_query_count(1000),
+          m_point_count(100000) {}
+
+protected:
+    virtual void SetUp()
+    {
+        randomPoints(m_point_count, m_points);
+        for (auto&& point : m_points) {
+            m_tree.add(&point, &point); // No insert, just adding
+        }
+        m_tree.build(); // Bulk build
+    }
+
+    virtual void TearDown()
+    {
+        m_tree.clear();
+        m_points.clear();
+    }
+
+    Point RandomPoint()
+    {
+        return {m_dis_x(m_gen), m_dis_y(m_gen), m_dis_z(m_gen)};
+    }
+
+    using Data = Point;
+
+    std::vector<Point> m_points;
+    kdtree<Data, Point> m_tree;
+    std::random_device m_rd;
+    std::mt19937 m_gen;
+    std::uniform_real_distribution<> m_dis_x;
+    std::uniform_real_distribution<> m_dis_y;
+    std::uniform_real_distribution<> m_dis_z;
+    std::size_t m_query_count;
+    std::size_t m_point_count;
+};
+
+using PointTypes = ::testing::Types<bgm::point<double, 2, boost::geometry::cs::cartesian>, bgm::point<double, 3, boost::geometry::cs::cartesian>>;
+TYPED_TEST_CASE(KdTreeTest, PointTypes);
+
+TYPED_TEST(KdTreeTest, build_tree_performance)
+{
 }
 
-TEST_F(KdTreeTest, identical_iterative_and_recursive_results) {
-    for (size_t i = 0; i < m_query_count; i++) {
-        const Point query = RandomPoint();
-        auto recursive_result = m_tree.nearest_recursive(query);
-        auto iterative_result = m_tree.nearest_iterative(query);
+TYPED_TEST(KdTreeTest, identical_iterative_and_recursive_results)
+{
+    using Point = TypeParam;
+    for (size_t i = 0; i < this->m_query_count; i++) {
+        const Point query = this->RandomPoint();
+        auto recursive_result = this->m_tree.nearest_recursive(query);
+        auto iterative_result = this->m_tree.nearest_iterative(query);
         bool identical = bg::equals(*recursive_result, *iterative_result);
         EXPECT_TRUE(recursive_result != nullptr);
         EXPECT_TRUE(identical) << bg::dsv(*recursive_result) << " != "<< bg::dsv(*iterative_result);
     }
 }
 
-TEST_F(KdTreeTest, recursive_performance) {
+TYPED_TEST(KdTreeTest, recursive_performance)
+{
+    using Point = TypeParam;
     TimeAccumulator time_acc;
-    for (std::size_t i = 0; i < m_query_count; i++) {
-        const Point query = RandomPoint();
+    for (std::size_t i = 0; i < this->m_query_count; i++) {
+        const Point query = this->RandomPoint();
         auto startTime = std::chrono::high_resolution_clock::now();
-        const Point* nearest = m_tree.nearest_recursive(query);
+        const Point* nearest = this->m_tree.nearest_recursive(query);
         auto endTime = std::chrono::high_resolution_clock::now();
         auto t = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
         time_acc(t);
@@ -145,12 +241,14 @@ TEST_F(KdTreeTest, recursive_performance) {
     std::cout << "Recursive performance (usec):\n" << time_acc << std::endl;
 }
 
-TEST_F(KdTreeTest, iterative_performance) {
+TYPED_TEST(KdTreeTest, iterative_performance)
+{
+    using Point = TypeParam;
     TimeAccumulator time_acc;
-    for (std::size_t i = 0; i < m_query_count; i++) {
-        const Point query = RandomPoint();
+    for (std::size_t i = 0; i < this->m_query_count; i++) {
+        const Point query = this->RandomPoint();
         auto startTime = std::chrono::high_resolution_clock::now();
-        const Point* nearest = m_tree.nearest_iterative(query);
+        const Point* nearest = this->m_tree.nearest_iterative(query);
         auto endTime = std::chrono::high_resolution_clock::now();
         auto t = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
         time_acc(t);
@@ -158,15 +256,17 @@ TEST_F(KdTreeTest, iterative_performance) {
     std::cout << "Iterative performance (usec):\n" << time_acc << std::endl;
 }
 
-TEST_F(KdTreeTest, knearest_performance) {
+TYPED_TEST(KdTreeTest, knearest_performance)
+{
+    using Point = TypeParam;
     TimeAccumulator time_acc;
     std::size_t k = 10;
     std::vector<const Point*> knearest_results;
-    for (std::size_t i = 0; i < m_query_count; i++) {
-        const Point query = RandomPoint();
+    for (std::size_t i = 0; i < this->m_query_count; i++) {
+        const Point query = this->RandomPoint();
         knearest_results.clear();
         auto startTime = std::chrono::high_resolution_clock::now();
-        m_tree.knearest(query, k, knearest_results);
+        this->m_tree.knearest(query, k, knearest_results);
         auto endTime = std::chrono::high_resolution_clock::now();
         auto t = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
         time_acc(t);
@@ -174,15 +274,17 @@ TEST_F(KdTreeTest, knearest_performance) {
     std::cout << "Recursive knearest (" << k << ") performance (usec):\n" << time_acc << std::endl;
 }
 
-TEST_F(KdTreeTest, check_knearest_results) {
+TYPED_TEST(KdTreeTest, check_knearest_results)
+{
+    using Point = TypeParam;
     std::vector<const Point*> knearest_results, linear_results;
     std::size_t k = 10;
     for (std::size_t i = 0; i < 10; i++) {
-        Point query = RandomPoint();
+        Point query = this->RandomPoint();
         linear_results.clear();
         knearest_results.clear();
-        LinearSearch(query, m_points, k, linear_results);
-        m_tree.knearest(query, k, knearest_results);
+        LinearSearch(query, this->m_points, k, linear_results);
+        this->m_tree.knearest(query, k, knearest_results);
         ASSERT_EQ(linear_results.size(), knearest_results.size());
         for (std::size_t j = 0; j < knearest_results.size(); j++) {
             const Point* a = linear_results.at(j);
@@ -194,6 +296,8 @@ TEST_F(KdTreeTest, check_knearest_results) {
 }
 
 TEST(WikipediaExample, test) {
+    using Point = bgm::d2::point_xy<double>;
+
     std::vector<Point> points = {{2, 3}, {5, 4}, {9, 6}, {4, 7}, {8, 1}, {7,2}};
     kdtree<Point> tree;
     for (std::size_t i = 0; i < points.size(); i++) {
@@ -209,6 +313,8 @@ TEST(WikipediaExample, test) {
 }
 
 TEST(DimensionRecursion, subtract) {
+    using Point = bgm::d2::point_xy<double>;
+
     Point p1(2,3);
     Point p2(5,1);
     EXPECT_EQ(-3, util::subtract(p1, p2, 0));
